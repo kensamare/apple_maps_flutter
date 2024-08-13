@@ -279,14 +279,14 @@ class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
         let sortedAnnotations = flutterAnnotations.sorted(by: { $0.zIndex  < $1.zIndex })
         return sortedAnnotations
     }
-       
+
     
     // Functions used for GestureRecognition
     private func initialiseTapGestureRecognizers() {
-        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(onMapGesture))
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan))
         panGesture.maximumNumberOfTouches = 2
         panGesture.delegate = self
-        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(onMapGesture))
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch))
         pinchGesture.delegate = self
         let rotateGesture = UIRotationGestureRecognizer(target: self, action: #selector(onMapGesture))
         rotateGesture.delegate = self
@@ -301,21 +301,178 @@ class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
         tapGesture.require(toFail: doubleTapGesture)    // only recognize taps that are not involved in zooming
         self.addGestureRecognizer(panGesture)
         self.addGestureRecognizer(pinchGesture)
-        self.addGestureRecognizer(rotateGesture)
+        //self.addGestureRecognizer(rotateGesture)
         self.addGestureRecognizer(tiltGesture)
         self.addGestureRecognizer(longTapGesture)
         self.addGestureRecognizer(doubleTapGesture)
         self.addGestureRecognizer(tapGesture)
     }
-       
-    @objc func onMapGesture(sender: UIGestureRecognizer) {
-        let locationOnMap = self.region.center // self.convert(locationInView, toCoordinateFrom: self)
-        let zoom = self.calculatedZoomLevel
-        let pitch = self.camera.pitch
-        let heading = self.actualHeading
-        self.updateCameraValues()
-        channel?.invokeMethod("camera#onMove", arguments: ["position": ["heading": heading, "target":  [locationOnMap.latitude, locationOnMap.longitude], "pitch": pitch, "zoom": zoom]])
+
+private var debouncerWorkItem: DispatchWorkItem?
+private let debounceDelay: TimeInterval = 1 // Задержка дебаунсера
+    private var distanceInMeters: Double = 0
+    
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        if gesture.state == .began {
+            debouncerWorkItem?.cancel()
+            isUserInteracting = true
+            let latitudeInRadians = self.centerCoordinate.latitude * .pi / 180
+            if #available(iOS 13.0, *) {
+                distanceInMeters = self.camera.centerCoordinateDistance / cos(latitudeInRadians)
+            } else {
+                // Fallback on earlier versions
+            }
+        }
+        
+        if gesture.state == .changed {
+            let translation = gesture.translation(in: self)
+            
+            let altitude = self.camera.altitude
+            let scaleFactor: Double = 0.00000001 * altitude
+            
+            let heading = self.camera.heading
+            let radians = heading * .pi / 180
+            let cosHeading = cos(radians)
+            let sinHeading = sin(radians)
+            
+            // Вычисляем смещения с учетом heading
+            let xMovement = translation.x * scaleFactor
+            let yMovement = translation.y * scaleFactor
+            
+            // Инвертируем оси, чтобы соответствовать системе координат карты
+            let adjustedLatitude = (cosHeading * yMovement) + (sinHeading * xMovement)
+            let adjustedLongitude = (cosHeading * xMovement) - (sinHeading * yMovement)
+            
+            // Учитываем изменение широты напрямую
+            let newLatitude = camera.centerCoordinate.latitude + adjustedLatitude
+            
+            // Учитываем изменение долготы в зависимости от широты
+            let longitudeAdjustment = adjustedLongitude / cos(camera.centerCoordinate.latitude * .pi / 180)
+            let newLongitude = camera.centerCoordinate.longitude - longitudeAdjustment
+            
+            // Ограничиваем значения широты и долготы
+            let clampedLatitude = min(max(newLatitude, -90.0), 90.0)
+            let clampedLongitude = min(max(newLongitude, -180.0), 180.0)
+            
+            let coords = CLLocationCoordinate2D(
+                latitude: clampedLatitude,
+                longitude: clampedLongitude
+            )
+            
+            let latitudeInRadians = coords.latitude * .pi / 180
+            if #available(iOS 13.0, *) {
+                let d = distanceInMeters * cos(latitudeInRadians)
+                self.setCamera(MKMapCamera(lookingAtCenter: coords, fromDistance: d, pitch: 0, heading: self.camera.heading), animated: false)
+            }
+            cmareMoveCallbackToFlutter()
+            gesture.setTranslation(.zero, in: self)
+        }
+        
+        if gesture.state == .ended || gesture.state == .cancelled {
+            onGestureEnd()
+        }
     }
+
+
+    
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        if gesture.state == .began {
+            debouncerWorkItem?.cancel()
+            isUserInteracting = true
+        }
+        if gesture.state == .changed {
+            
+            // Вычисляем новый zoomLevel на основе масштаба
+            let newZoomLevel = self.camera.altitude / Double(gesture.scale)
+            let newAltitude = min(max(newZoomLevel, 1), 100000000) // Ограниваем минимальный и максимальный уровень зума
+            
+            // Устанавливаем новый уровень зума и сохраняем текущее направление (heading)
+            let latitudeInRadians = self.centerCoordinate.latitude * .pi / 180
+            camera.altitude = newAltitude
+            
+            if #available(iOS 13.0, *) {
+                distanceInMeters = self.camera.centerCoordinateDistance / cos(latitudeInRadians)
+            }
+            cmareMoveCallbackToFlutter()
+            
+            // Сбрасываем масштаб жеста
+            gesture.scale = 1.0
+        }
+        if gesture.state == .ended || gesture.state == .cancelled {
+            onGestureEnd()
+        }
+    }
+
+    
+    @objc func cmareMoveCallbackToFlutter(){
+                    let locationOnMap = self.region.center
+                    let zoom = self.calculatedZoomLevel
+                    let pitch = self.camera.pitch
+                    let heading = self.actualHeading
+                    self.updateCameraValues()
+                    channel?.invokeMethod("camera#onMove", arguments: [
+                        "position": [
+                            "heading": heading,
+                            "target": [locationOnMap.latitude, locationOnMap.longitude],
+                            "pitch": pitch,
+                            "zoom": zoom
+                        ]
+                    ])
+    }
+    
+    @objc func onMapGesture(sender: UIGestureRecognizer) {
+//        print(sender)
+//        // Проверка состояния жеста
+//        switch sender.state {
+//        case .began:
+//            debouncerWorkItem?.cancel()
+//            // Жест начался
+//            isUserInteracting = true
+//            channel?.invokeMethod("map#onUserInteract", arguments: isUserInteracting)
+//            break
+//
+//        case .changed:
+//            // Жест продолжаетс
+//            let locationOnMap = self.region.center
+//            let zoom = self.calculatedZoomLevel
+//            let pitch = self.camera.pitch
+//            let heading = self.actualHeading
+//            self.updateCameraValues()
+//            channel?.invokeMethod("camera#onMove", arguments: [
+//                "position": [
+//                    "heading": heading,
+//                    "target": [locationOnMap.latitude, locationOnMap.longitude],
+//                    "pitch": pitch,
+//                    "zoom": zoom
+//                ]
+//            ])
+//            break
+//
+//        case .ended:
+//            onGestureEnd()
+//            break
+//            // Можно добавить дополнительную логику для завершения жеста
+//
+//        case .cancelled:
+//            onGestureEnd()
+//            break
+//
+//        default:
+//            break
+//        }
+    }
+
+    @objc func onGestureEnd(){
+            // Запускаем дебаунсер, чтобы установить isUserInteracting в false через debounceDelay
+            let workItem = DispatchWorkItem { [weak self] in
+                isUserInteracting = false
+                self?.channel?.invokeMethod("map#onUserInteract", arguments: isUserInteracting ?? false)
+            }
+            debouncerWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + debounceDelay, execute: workItem)
+
+    }
+
 
     @objc func longTap(sender: UIGestureRecognizer){
         if sender.state == .began {
@@ -350,3 +507,4 @@ class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
         return CGFloat(sqrt(xDist * xDist + yDist * yDist))
     }
 }
+

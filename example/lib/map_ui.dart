@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:async';
+
 import 'package:apple_maps_flutter/apple_maps_flutter.dart';
 import 'package:flutter/material.dart';
 
@@ -33,21 +35,21 @@ class MapUiBodyState extends State<MapUiBody> {
 
   static final CameraPosition _kInitialPosition = const CameraPosition(
     target: LatLng(-33.852, 151.211),
-    zoom: 11,
+    zoom: 3,
   );
 
   CameraPosition _position = _kInitialPosition;
   bool _isMapCreated = false;
   bool _isMoving = false;
-  bool _compassEnabled = true;
-  bool _myLocationButtonEnabled = true;
+  bool _compassEnabled = false;
+  bool _myLocationButtonEnabled = false;
   MinMaxZoomPreference _minMaxZoomPreference = MinMaxZoomPreference.unbounded;
   MapType _mapType = MapType.standard;
-  bool _rotateGesturesEnabled = true;
-  bool _scrollGesturesEnabled = true;
-  bool _pitchGesturesEnabled = true;
-  bool _zoomGesturesEnabled = true;
-  bool _myLocationEnabled = true;
+  bool _rotateGesturesEnabled = false;
+  bool _scrollGesturesEnabled = false;
+  bool _pitchGesturesEnabled = false;
+  bool _zoomGesturesEnabled = false;
+  bool _myLocationEnabled = false;
   TrackingMode _trackingMode = TrackingMode.none;
   @override
   void initState() {
@@ -174,7 +176,7 @@ class MapUiBodyState extends State<MapUiBody> {
       initialCameraPosition: _kInitialPosition,
       compassEnabled: _compassEnabled,
       minMaxZoomPreference: _minMaxZoomPreference,
-      mapType: _mapType,
+      mapType: MapType.satellite,
       rotateGesturesEnabled: _rotateGesturesEnabled,
       scrollGesturesEnabled: _scrollGesturesEnabled,
       pitchGesturesEnabled: _pitchGesturesEnabled,
@@ -214,6 +216,19 @@ class MapUiBodyState extends State<MapUiBody> {
                   _zoomToggler(),
                   _myLocationToggler(),
                   _myLocationButtonToggler(),
+                  FloatingActionButton(onPressed: () {
+                    if (timer == null){
+                      timer =
+                          Timer.periodic(Duration(milliseconds: 100), (timer) {
+                            heading += 0.5;
+                            _controller?.moveCamera(CameraUpdate.updateHeading(
+                                heading % 360));
+                          });
+                  } else{
+                      timer?.cancel();
+                      timer = null;
+                    }
+                  }),
                 ],
               ),
             ],
@@ -224,13 +239,18 @@ class MapUiBodyState extends State<MapUiBody> {
     return Column(children: columnChildren);
   }
 
+  Timer? timer;
+  double heading = 0;
+
   void _updateCameraPosition(CameraPosition position) {
     setState(() {
       _position = position;
     });
   }
 
+  AppleMapController? _controller;
   void onMapCreated(AppleMapController controller) {
+    _controller = controller;
     setState(() {
       _isMapCreated = true;
     });

@@ -38,11 +38,13 @@ class AppleMap extends StatefulWidget {
     this.polygons,
     this.onCameraMoveStarted,
     this.onCameraMove,
+    this.onCameraMoveByProgram,
     this.onCameraIdle,
     this.onTap,
     this.onLongPress,
     this.snapshotOptions,
     this.insetsLayoutMarginsFromSafeArea = true,
+    this.onIOSUserInteraction,
   }) : super(key: key);
 
   final MapCreatedCallback? onMapCreated;
@@ -107,10 +109,13 @@ class AppleMap extends StatefulWidget {
   /// This may be called as often as once every frame and should
   /// not perform expensive operations.
   final CameraPositionCallback? onCameraMove;
+  final CameraPositionCallback? onCameraMoveByProgram;
 
   /// Called when camera movement has ended, there are no pending
   /// animations and the user has stopped interacting with the map.
   final VoidCallback? onCameraIdle;
+
+  final void Function(bool isUserInteract)? onIOSUserInteraction;
 
   /// Called every time a [AppleMap] is tapped.
   final ArgumentCallback<LatLng>? onTap;
@@ -320,6 +325,10 @@ class _AppleMapState extends State<AppleMap> {
 
   void onLongPress(LatLng position) {
     widget.onLongPress?.call(position);
+  }
+
+  void onIOSUserInteraction(bool isUserInteract){
+    widget.onIOSUserInteraction?.call(isUserInteract);
   }
 }
 

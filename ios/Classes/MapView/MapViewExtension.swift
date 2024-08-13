@@ -70,13 +70,13 @@ public extension MKMapView {
 
             let zoomExponent = Utils.logC(val: zoomScale, forBase: 2)
 
-            var zoomLevel = 21 - zoomExponent
+            var zoomLevel = 20 - zoomExponent
             
             zoomLevel = Utils.roundToTwoDecimalPlaces(number: zoomLevel)
             
             Holder._zoomLevel = zoomLevel
             
-            return zoomLevel
+            return Holder._zoomLevel
             
         }
         set (newZoomLevel) {
@@ -86,8 +86,10 @@ public extension MKMapView {
     
     func setCenterCoordinate(_ positionData: Dictionary<String, Any>, animated: Bool) {
         let targetList :Array<CLLocationDegrees> = positionData["target"] as? Array<CLLocationDegrees> ?? [self.camera.centerCoordinate.latitude, self.camera.centerCoordinate.longitude]
+//        print(targetList)
         let zoom :Double = positionData["zoom"] as? Double ?? Holder._zoomLevel
         Holder._zoomLevel = zoom
+        print(Holder._zoomLevel)
         if let pitch :CGFloat = positionData["pitch"] as? CGFloat {
             Holder._pitch = pitch
         }
@@ -117,7 +119,7 @@ public extension MKMapView {
         let zoomL = min(zoomLevel, 28);
     
         // use the zoom level to compute the region
-        let span = self.coordinateSpanWithMapView(centerCoordinate: centerCoordinate, zoomLevel: Int(zoomL))
+        let span = self.coordinateSpanWithMapView(centerCoordinate: centerCoordinate, zoomLevel: Double(zoomL))
         let region = MKCoordinateRegion.init(center: centerCoordinate, span: span)
         
         // set the region like normal
@@ -131,7 +133,7 @@ public extension MKMapView {
         }
     }
     
-    func coordinateSpanWithMapView(centerCoordinate: CLLocationCoordinate2D, zoomLevel: Int) -> MKCoordinateSpan  {
+    func coordinateSpanWithMapView(centerCoordinate: CLLocationCoordinate2D, zoomLevel: Double) -> MKCoordinateSpan  {
         // convert center coordiate to pixel space
         let centerPixelX = Utils.longitudeToPixelSpaceX(longitude: centerCoordinate.longitude)
         let centerPixelY = Utils.latitudeToPixelSpaceY(latitude: centerCoordinate.latitude)
@@ -290,6 +292,23 @@ public extension MKMapView {
         Holder._pitch = newPitch
         Holder._heading = newHeading
     }
+
+    func updateHeading(heading: Double, animated: Bool) {
+    if isUserInteracting {return;}
+            Holder._heading = heading
+            self.updateHeadingOnCamera(heading: heading, animated: false)
+        }
+
+func updateHeadingOnCamera(heading: Double, animated: Bool) {
+    let currentCamera = self.camera
+    currentCamera.heading = heading
+    self.setCamera(currentCamera, animated: animated)
+    if #available(iOS 13.0, *) {
+                    print(self.cameraBoundary?.mapRect)
+                }
+}
+
+
 }
 
 extension Array where Element == CLLocationCoordinate2D {

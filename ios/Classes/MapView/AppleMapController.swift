@@ -269,6 +269,10 @@ public class AppleMapController: NSObject, FlutterPlatformView {
                 mapView.zoomIn(animated: animated)
             case "zoomOut":
                 mapView.zoomOut(animated: animated)
+            case "updateHeading":
+            if let heading: Double = data[1] as? Double {
+                                mapView.updateHeading(heading: heading, animated: animated)
+                            }
             default:
                 positionData = [:]
             }
@@ -278,13 +282,15 @@ public class AppleMapController: NSObject, FlutterPlatformView {
     }
 }
 
+var isUserInteracting = false
+var isProgrammaticChange = false
 
 extension AppleMapController: MKMapViewDelegate {
     // onIdle
     public func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
         if ((self.mapView.mapContainerView) != nil) {
             let locationOnMap = self.mapView.region.center
-            self.channel.invokeMethod("camera#onMove", arguments: ["position": ["heading": self.mapView.actualHeading, "target":  [locationOnMap.latitude, locationOnMap.longitude], "pitch": self.mapView.camera.pitch, "zoom": self.mapView.calculatedZoomLevel]])
+            self.channel.invokeMethod("camera#onMoveProgram", arguments: ["position": ["heading": self.mapView.actualHeading, "target":  [locationOnMap.latitude, locationOnMap.longitude], "pitch": self.mapView.camera.pitch, "zoom": self.mapView.calculatedZoomLevel]])
         }
         self.channel.invokeMethod("camera#onIdle", arguments: "")
     }

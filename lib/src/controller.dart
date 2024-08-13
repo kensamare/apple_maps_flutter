@@ -44,6 +44,11 @@ class AppleMapController {
           CameraPosition.fromMap(call.arguments['position'])!,
         );
         break;
+      case 'camera#onMoveProgram':
+        _appleMapState.widget.onCameraMoveByProgram?.call(
+          CameraPosition.fromMap(call.arguments['position'])!,
+        );
+        break;
       case 'camera#onIdle':
         _appleMapState.widget.onCameraIdle?.call();
         break;
@@ -76,6 +81,10 @@ class AppleMapController {
       case 'map#onLongPress':
         _appleMapState
             .onLongPress(LatLng._fromJson(call.arguments['position'])!);
+        break;
+      case 'map#onUserInteract':
+        _appleMapState
+            .onIOSUserInteraction(call.arguments);
         break;
       default:
         throw MissingPluginException();

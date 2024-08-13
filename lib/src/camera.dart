@@ -154,6 +154,10 @@ class CameraUpdate {
     return CameraUpdate._(<dynamic>['zoomTo', zoom]);
   }
 
+  static CameraUpdate updateHeading(double heading) {
+    return CameraUpdate._(<dynamic>['updateHeading', heading]);
+  }
+
   final dynamic _json;
 
   dynamic _toJson() => _json;
