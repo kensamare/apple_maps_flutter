@@ -158,6 +158,10 @@ class CameraUpdate {
     return CameraUpdate._(<dynamic>['updateHeading', heading]);
   }
 
+  static CameraUpdate newCenter(LatLng latLng) {
+    return CameraUpdate._(<dynamic>['newCenter', latLng._toJson()]);
+  }
+
   final dynamic _json;
 
   dynamic _toJson() => _json;

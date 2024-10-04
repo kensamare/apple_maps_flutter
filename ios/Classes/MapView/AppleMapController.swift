@@ -247,6 +247,11 @@ public class AppleMapController: NSObject, FlutterPlatformView {
                 if let _positionData : Array<Any> = data[1] as? Array<Any> {
                     positionData = ["target": _positionData]
                 }
+            case "newCenter":
+                if let _positionData : Array<CLLocationDegrees> = data[1] as? Array<CLLocationDegrees>  {
+                    mapView.updateCenter(position: _positionData);
+//                    positionData = ["target": _positionData]
+                }
             case "newLatLngZoom":
                 if let _positionData: Array<Any> = data[1] as? Array<Any> {
                     let zoom: Double = data[2] as? Double ?? 0

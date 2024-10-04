@@ -303,10 +303,21 @@ func updateHeadingOnCamera(heading: Double, animated: Bool) {
     let currentCamera = self.camera
     currentCamera.heading = heading
     self.setCamera(currentCamera, animated: animated)
-    if #available(iOS 13.0, *) {
-                    print(self.cameraBoundary?.mapRect)
-                }
 }
+    
+    func updateCenter(position: Array<CLLocationDegrees>){
+        print(position)
+        let coords = CLLocationCoordinate2D(
+            latitude: position[0],
+            longitude: position[1]
+        )
+        let latitudeInRadians = self.centerCoordinate.latitude * .pi / 180
+        if #available(iOS 13.0, *) {
+            let distanceInMeters = self.camera.centerCoordinateDistance / cos(latitudeInRadians)
+            let d = distanceInMeters * cos(latitudeInRadians)
+            self.setCamera(MKMapCamera(lookingAtCenter: coords, fromDistance: d, pitch: 0, heading: self.camera.heading), animated: false)
+        }
+    }
 
 
 }

@@ -207,6 +207,9 @@ class MapUiBodyState extends State<MapUiBody> {
               Wrap(
                 alignment: WrapAlignment.spaceEvenly,
                 children: <Widget>[
+                  TextButton(onPressed: (){
+                    _controller?.moveCamera(CameraUpdate.newCenter(LatLng(_position.target.latitude, _position.target.longitude + 0.1)));
+                  }, child: Text('TEST')),
                   _compassToggler(),
                   _mapTypeCycler(),
                   _zoomBoundsToggler(),
